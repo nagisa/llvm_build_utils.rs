@@ -2,12 +2,15 @@ use std::path::PathBuf;
 use std::process::Command;
 
 fn main(){
-    let (path, lib) = find_llvm_lib();
-    println!("cargo:rustc-link-search=native={}", path.display());
+    let mut lib = find_llvm_lib();
+    if cfg!(windows) {
+        // because banana
+        lib.push_str(".dll");
+    }
     println!("cargo:rustc-link-lib=dylib={}", lib);
 }
 
-fn find_llvm_lib() -> (PathBuf, String) {
+fn find_llvm_lib() -> String {
     // TODO: cargo does not export us a $RUSTC
     let sysroot = Command::new("rustc").arg("--print=sysroot").output()
         .expect("could not execute rustc");
@@ -28,7 +31,7 @@ fn find_llvm_lib() -> (PathBuf, String) {
         if let Some(Some(st)) = fname.map(|f| f.to_str()) {
             println!("{:?} in lib", st);
             if let Some(i) = st.find("rustc_llvm") {
-                return (path, String::from(&st[i..]));
+                return String::from(&st[i..]);
             }
         }
     }
@@ -39,10 +42,9 @@ fn find_llvm_lib() -> (PathBuf, String) {
         if let Some(Some(st)) = fname.map(|f| f.to_str()) {
             println!("{:?} in bin", st);
             if let Some(i) = st.find("rustc_llvm") {
-                return (path, String::from(&st[i..]));
+                return String::from(&st[i..]);
             }
         }
     }
     panic!("could not find rustc_llvm library");
-
 }
