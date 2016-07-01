@@ -14,8 +14,8 @@ document such breakages in the table below.
 
 # Using llvm_build_utils
 
-First, you'll want to both add a build script for your crate (build.rs) and also add this crate to
-your Cargo.toml via:
+First, you’ll want to both add a build script for your crate (`build.rs`) and also add this crate
+to your `Cargo.toml` via:
 
 ```toml
 [package]
