@@ -10,7 +10,7 @@ doesn’t even need LLVM installation*!"""
 documentation = "https://crates.fyi/crates/llvm_build_utils/0.1.0"
 repository = "https://github.com/nagisa/llvm_build_utils.rs"
 keywords = ["llvm", "asm", "ll", "bc"]
-license = "ISC/Apache 2.0"
+license = "ISC/Apache-2.0"
 
 [dependencies]
 libc="0.2"
