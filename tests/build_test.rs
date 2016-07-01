@@ -29,6 +29,21 @@ fn test_cpu_attr() {
 }
 
 #[test]
+fn allow_dynamic_dispatch() {
+    use std::path::*;
+    let pb = PathBuf::from("libtest.a");
+    let t1 = Path::new("tests/test.ll");
+    build_archive(&pb as &AsRef<Path>,
+    &[(&t1 as &AsRef<Path>, BuildOptions {
+        triple: String::from("x86_64-unknown-linux-gnu"),
+        ..BuildOptions::default()
+    }), (&"tests/test.ll" as &AsRef<Path>, BuildOptions {
+        triple: String::from("i386-unknown-linux-gnu"),
+        ..BuildOptions::default()
+    })]).unwrap();
+}
+
+#[test]
 fn test_optimisation() {
     build_archive("librandopt.a", &[("tests/rdrand.ll", BuildOptions {
         triple: String::from("x86_64-unknown-linux-gnu"),
