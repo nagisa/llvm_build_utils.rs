@@ -19,13 +19,25 @@ fn find_llvm_lib() -> (PathBuf, String) {
             break;
         }
     }
-    let mut path = PathBuf::from(path);
-    path.push("lib");
-    for entry in path.read_dir().expect("could not read dir") {
+    println!("sysroot is {:?}", path);
+    let path = PathBuf::from(path);
+    for entry in path.join("lib").read_dir().expect("could not read dir") {
         let entry_path = entry.expect("could not read dir").path();
         let entry_path = entry_path.with_extension("");
         let fname = entry_path.file_name();
         if let Some(Some(st)) = fname.map(|f| f.to_str()) {
+            println!("{:?} in lib", st);
+            if let Some(i) = st.find("rustc_llvm") {
+                return (path, String::from(&st[i..]));
+            }
+        }
+    }
+    for entry in path.join("bin").read_dir().expect("could not read dir") {
+        let entry_path = entry.expect("could not read dir").path();
+        let entry_path = entry_path.with_extension("");
+        let fname = entry_path.file_name();
+        if let Some(Some(st)) = fname.map(|f| f.to_str()) {
+            println!("{:?} in bin", st);
             if let Some(i) = st.find("rustc_llvm") {
                 return (path, String::from(&st[i..]));
             }
