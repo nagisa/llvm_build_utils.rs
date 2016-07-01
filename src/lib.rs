@@ -219,7 +219,7 @@ macro_rules! fail_if {
 
 /// Produce a static library containing machine code for LLVM-IR/bytecode files at pathes produced
 /// by the iterator.
-pub fn build_archive<'a, P: 'a, I>(iter: I, archive: P)
+pub fn build_archive<'a, P: 'a, I>(archive: P, iter: I)
 -> Result<(), String>
 where P: AsRef<Path>, I: IntoIterator<Item=&'a (P, BuildOptions)>
 {

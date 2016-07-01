@@ -33,13 +33,13 @@ extern crate llvm_build_utils;
 use llvm_build_utils::*;
 
 fn main() {
-    build_archive(&[
+    build_archive("libyourthing.a", &[
     ("input.ll", BuildOptions {
         // customise how the file is built
         ..BuildOptions::default()
     })/*, ("input2.ll", ...
         // more .ll files to be built into the archive in same format as first one
-    */], "libyourthing.a").expect("error happened");
+    */]).expect("error happened");
 }
 ```
 
