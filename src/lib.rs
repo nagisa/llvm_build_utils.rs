@@ -191,7 +191,7 @@ pub enum Optimisation {
 #[allow(dead_code)]
 #[repr(C)]
 #[derive(Copy, Clone)]
-pub enum ArchiveKind {
+enum ArchiveKind {
     Gnu,
     Mips64,
     Bsd,
@@ -202,14 +202,15 @@ pub enum ArchiveKind {
 pub struct BuildOptions {
     /// Target triple to generate machine code for
     ///
-    /// *Defaults* to `$TARGET` environment variable, if set (always is in cargo build scripts).
-    /// The target triple has the general format <arch><sub>-<vendor>-<sys>-<abi>, where:
+    /// The target triple has the general format `<arch><sub>-<vendor>-<sys>-<abi>`, where:
     ///
-    /// * <arch>   x86, arm, thumb, mips, etc.
-    /// * <sub>    for example on ARM: v5, v6m, v7a, v7m, etc.
-    /// * <vendor> pc, apple, nvidia, ibm, etc.
-    /// * <sys>    none, linux, win32, darwin, cuda, etc.
-    /// * <abi>    eabi, gnu, android, macho, elf, etc.
+    /// * `<arch>`   x86, arm, thumb, mips, etc.
+    /// * `<sub>`    for example on ARM: v5, v6m, v7a, v7m, etc.
+    /// * `<vendor>` pc, apple, nvidia, ibm, etc.
+    /// * `<sys>`    none, linux, win32, darwin, cuda, etc.
+    /// * `<abi>`    eabi, gnu, android, macho, elf, etc.
+    ///
+    /// *Defaults* to `$TARGET` environment variable, if set (always is in cargo build scripts).
     ///
     /// Corresponds to the `-mtriple` option of `llc`.
     pub triple: String,
@@ -244,7 +245,7 @@ pub struct BuildOptions {
     pub reloc: Relocations,
     /// Code optimisation level
     ///
-    /// *Defaults` to the same level as specified by `$OPT_LEVEL` environment variable (set by
+    /// *Defaults* to the same level as specified in the `$OPT_LEVEL` environment variable (set by
     /// cargo) and `Optimisation::O0` if not set.
     ///
     /// Corresponds to the `-O` option of `llc`.
