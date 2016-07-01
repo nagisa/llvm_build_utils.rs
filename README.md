@@ -25,7 +25,7 @@ to your `Cargo.toml` via:
 build = "build.rs"
 
 [build-dependencies]
-llvm_build_utils = "0.1"
+llvm_build_utils = "0.2"
 ```
 
 Then write your `build.rs` like this:
