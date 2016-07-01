@@ -1,14 +1,13 @@
 Ever wanted to build “native” assemblyish stuff in your cargo build scripts… something gcc crate
 cannot quite handle yet? Welcome to llvm_build_utils which provides a convenient API to pack your
 LLVM-IR or LLVM bytecode files into a ready to use archive full of machine code! It doesn’t even
-need LLVM installation and works on stable Rust¹!
-
-No MSVC windows support yet, though
+need LLVM installation and works on stable Rust¹²!
 
 [Documentation](TBA)
 
 ¹: May break between versions or be incompatible with some versions of Rust, though. We’ll try to
 document such breakages in the table below.
+²: On Windows the library only works with nightly rustc for now.
 
 # Compatibility table
 

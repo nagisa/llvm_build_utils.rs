@@ -1,13 +1,23 @@
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
+use std::ffi::OsStr;
 use std::process::Command;
 
 fn main(){
-    let (path, lib) = find_llvm_lib();
-    println!("cargo:rustc-link-search=native={}", path.display());
-    println!("cargo:rustc-link-lib=dylib={}", lib);
+    find_llvm_lib().map_or_else(|| {
+        println!("cargo:rustc-cfg=use_extern");
+    }, |lib| {
+        let lname = path_to_link_name(&lib).expect("could not generate argument to -l");
+        println!("cargo:rustc-link-lib=dylib={}", lname);
+    });
 }
 
-fn find_llvm_lib() -> (PathBuf, String) {
+fn path_to_link_name<'a, P: AsRef<Path>>(p: &'a P) -> Option<&'a str> {
+    p.as_ref().file_stem().and_then(OsStr::to_str).map(|s| {
+        s.trim_left_matches("lib")
+    })
+}
+
+fn find_llvm_lib() -> Option<PathBuf> {
     // TODO: cargo does not export us a $RUSTC
     let sysroot = Command::new("rustc").arg("--print=sysroot").output()
         .expect("could not execute rustc");
@@ -23,26 +33,24 @@ fn find_llvm_lib() -> (PathBuf, String) {
     let path = PathBuf::from(path);
     for entry in path.join("lib").read_dir().expect("could not read dir") {
         let entry_path = entry.expect("could not read dir").path();
-        let entry_path = entry_path.with_extension("");
-        let fname = entry_path.file_name();
-        if let Some(Some(st)) = fname.map(|f| f.to_str()) {
+        let ret = if let Some(Some(st)) = entry_path.file_name().map(|f| f.to_str()) {
             println!("{:?} in lib", st);
-            if let Some(i) = st.find("rustc_llvm") {
-                return (path, String::from(&st[i..]));
-            }
+            st.contains("rustc_llvm")
+        } else { false };
+        if ret {
+            return Some(entry_path);
         }
     }
-    for entry in path.join("bin").read_dir().expect("could not read dir") {
-        let entry_path = entry.expect("could not read dir").path();
-        let entry_path = entry_path.with_extension("");
-        let fname = entry_path.file_name();
-        if let Some(Some(st)) = fname.map(|f| f.to_str()) {
-            println!("{:?} in bin", st);
-            if let Some(i) = st.find("rustc_llvm") {
-                return (path, String::from(&st[i..]));
-            }
-        }
-    }
-    panic!("could not find rustc_llvm library");
-
+    // Do not search for windows stuff yet, it simply does not work.
+    // for entry in path.join("bin").read_dir().expect("could not read dir") {
+    //     let entry_path = entry.expect("could not read dir").path();
+    //     let ret = if let Some(Some(st)) = entry_path.file_name().map(|f| f.to_str()) {
+    //         println!("{:?} in bin", st);
+    //         st.contains(".dll.lib") && st.contains("rustc_llvm")
+    //     } else { false };
+    //     if ret {
+    //         return Some(entry_path);
+    //     }
+    // }
+    None
 }

@@ -42,6 +42,7 @@
 //! Running a `cargo build` should produce `libyourthing.a` which then may be linked to your Rust
 //! executable/library.
 #![allow(non_camel_case_types, non_upper_case_globals)]
+#![cfg_attr(use_extern, feature(rustc_private))]
 extern crate libc;
 extern crate mktemp;
 
@@ -274,6 +275,14 @@ impl Default for BuildOptions {
     }
 }
 
+#[cfg(use_extern)]
+fn initialize_llvm() {
+    extern crate rustc_llvm;
+    static ONCE: Once = ONCE_INIT;
+    ONCE.call_once(|| rustc_llvm::initialize_available_targets());
+}
+
+#[cfg(not(use_extern))]
 fn initialize_llvm() {
     static ONCE: Once = ONCE_INIT;
 
