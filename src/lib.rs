@@ -1,14 +1,46 @@
 //! build.rs utils for building LLVM-IR and bytecode
 //!
-//! Building assembly in a cross-os manner is a very painful endeavour requiring to be aware of
-//! various assemblers available for each platform etc. Using LLVM-IR as *the* assembly is the
-//! better alternative, and this crate provides tools converting your .ll or .bc files into .a you
-//! can link into your next great thing.
+//! Building assembly in a cross platform manner is a very painful endeavour requiring to be aware
+//! of various assemblers available and syntaxes they use. Using LLVM-IR as *the* assembly is a
+//! better alternative and this crate provides tools converting your `.ll` or `.bc` files into `.a`
+//! archives containing machine code. These archives can then be statically linked to your project.
 //!
-//! Uses the same LLVM as rustc thus avoiding the need for installed LLVM.
+//! This library does not need an installation of LLVM or `ar` to work. The LLVM which comes with
+//! rustc is used instead. While this library works perfectly on stable versions of the compiler,
+//! the library may be incompatible with a future version of rustc.
 //!
-//! While this library does work on stable, it may break between Rust releases due to abuse of
-//! stability system.
+//! # Usage
+//!
+//! First, you’ll want to both add a build script for your crate (`build.rs`) and also add this
+//! crate to your `Cargo.toml` via:
+//!
+//! ```toml
+//! [package]
+//! # ...
+//! build = "build.rs"
+//!
+//! [build-dependencies]
+//! llvm_build_utils = "0.1"
+//! ```
+//!
+//! Then write your `build.rs` like this:
+//!
+//! ```rust,no_run
+//! extern crate llvm_build_utils;
+//! use llvm_build_utils::*;
+//!
+//! fn main() {
+//!     build_archive("libyourthing.a", &[
+//!         ("input.ll", BuildOptions {
+//!             ..BuildOptions::default() // customise how the file is built
+//!         })
+//!     ]).expect("error happened");
+//!     // ...
+//! }
+//! ```
+//!
+//! Running a `cargo build` should produce `libyourthing.a` which then may be linked to your Rust
+//! executable/library.
 #![allow(non_camel_case_types, non_upper_case_globals)]
 extern crate libc;
 extern crate mktemp;
@@ -168,12 +200,56 @@ pub enum ArchiveKind {
 
 #[derive(Debug)]
 pub struct BuildOptions {
+    /// Target triple to generate machine code for
+    ///
+    /// *Defaults* to `$TARGET` environment variable, if set (always is in cargo build scripts).
+    /// The target triple has the general format <arch><sub>-<vendor>-<sys>-<abi>, where:
+    ///
+    /// * <arch>   x86, arm, thumb, mips, etc.
+    /// * <sub>    for example on ARM: v5, v6m, v7a, v7m, etc.
+    /// * <vendor> pc, apple, nvidia, ibm, etc.
+    /// * <sys>    none, linux, win32, darwin, cuda, etc.
+    /// * <abi>    eabi, gnu, android, macho, elf, etc.
+    ///
+    /// Corresponds to the `-mtriple` option of `llc`.
     pub triple: String,
+    /// Target CPU to generate machine code for
+    ///
+    /// *Default* is chosen depending on the target `triple`.
+    ///
+    /// Corresponds to the `-mcpu` option of `llc`.
     pub cpu: String,
+    /// Capabilities of the target code is generated for
+    ///
+    /// Format of this field is the same as the format for `-mattr` option: +feature enables a
+    /// feature, -feature disables it. Each feature is delimited by a comma.
+    ///
+    /// Sample string: `+sse,+sse2,+sse3,-avx`.
+    ///
+    /// *Default* is chosen depending on the target `triple`.
+    ///
+    /// Corresponds to the `-mattr` option of `llc`.
     pub attr: String,
-    pub model: CodeGenModel,
-    pub reloc: RelocMode,
-    pub opt: CodeGenOptLevel,
+    /// Code generation
+    ///
+    /// *Defaults* to `CodegenModel::Default`.
+    ///
+    /// Corresponds to the `-code-model` option of `llc`.
+    pub model: CodegenModel,
+    /// Relocation model
+    ///
+    /// *Defaults* to `Relocations::Default`.
+    ///
+    /// Corresponds to the `-relocation-model` option of `llc`.
+    pub reloc: Relocations,
+    /// Code optimisation level
+    ///
+    /// *Defaults` to the same level as specified by `$OPT_LEVEL` environment variable (set by
+    /// cargo) and `Optimisation::O0` if not set.
+    ///
+    /// Corresponds to the `-O` option of `llc`.
+    pub opt: Optimisation,
+    /// Name of the archive section to insert generated object into
     pub ar_section_name: String,
 }
 
@@ -242,8 +318,10 @@ macro_rules! fail_if {
     }
 }
 
-/// Produce a static library containing machine code for LLVM-IR/bytecode files at pathes produced
-/// by the iterator.
+/// Produce a static library (archive) containing machine code
+///
+/// The input files must be well formed LLVM-IR files or LLVM bytecode. Format of the input file
+/// is autodetected.
 pub fn build_archive<'a, P: 'a, I>(archive: P, iter: I)
 -> Result<(), String>
 where P: AsRef<Path>, I: IntoIterator<Item=&'a (P, BuildOptions)>

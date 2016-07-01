@@ -1,7 +1,9 @@
-Ever wanted to build “native” assembly stuff in your cargo build scripts… something gcc crate
-cannot quite handle yet?  Welcome to llvm_build_utils which provides a convenient API to pack your
-.ll or .bc files into a ready to use archive full of machine code! It doesn’t even need LLVM
-installation and works on stable Rust¹!
+Ever wanted to build “native” assemblyish stuff in your cargo build scripts… something gcc crate
+cannot quite handle yet? Welcome to llvm_build_utils which provides a convenient API to pack your
+LLVM-IR or LLVM bytecode files into a ready to use archive full of machine code! It doesn’t even
+need LLVM installation and works on stable Rust¹!
+
+[Documentation](TBA)
 
 ¹: May break between versions or be incompatible with some versions of Rust, though. We’ll try to
 document such breakages in the table below.
@@ -10,7 +12,7 @@ document such breakages in the table below.
 
 | Rustc version | This Library  |
 | ------------- | ------------- |
-| 1.8-1.11      | 0.1.0         |
+| 1.8-1.11      | 0.1-0.2       |
 
 # Using llvm_build_utils
 
@@ -34,12 +36,11 @@ use llvm_build_utils::*;
 
 fn main() {
     build_archive("libyourthing.a", &[
-    ("input.ll", BuildOptions {
-        // customise how the file is built
-        ..BuildOptions::default()
-    })/*, ("input2.ll", ...
-        // more .ll files to be built into the archive in same format as first one
-    */]).expect("error happened");
+        ("input.ll", BuildOptions {
+            ..BuildOptions::default() // customise how the file is built
+        })
+    ]).expect("error happened");
+    // ...
 }
 ```
 
