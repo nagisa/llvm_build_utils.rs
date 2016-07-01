@@ -14,6 +14,14 @@ fn test_build() {
 }
 
 #[test]
+fn test_bytecode_build() {
+    build_archive("libtestbc.a", &[("tests/test.bc", BuildOptions {
+        triple: String::from("x86_64-unknown-linux-gnu"),
+        ..BuildOptions::default()
+    })]).unwrap();
+}
+
+#[test]
 fn test_cpu_attr() {
     build_archive("librand.a", &[("tests/rdrand.ll", BuildOptions {
         triple: String::from("x86_64-unknown-linux-gnu"),
@@ -49,7 +57,7 @@ fn test_optimisation() {
         triple: String::from("x86_64-unknown-linux-gnu"),
         cpu: String::from("x86-64"),
         attr: String::from("+rdrnd"),
-        opt: CodeGenOptLevel::O3,
+        opt: Optimisation::O3,
         ..BuildOptions::default()
     })]).unwrap();
 }

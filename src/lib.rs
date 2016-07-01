@@ -20,8 +20,6 @@ use std::sync::{Once, ONCE_INIT};
 type LLVMBool = libc::c_uint;
 const LLVMTrue: LLVMBool = 1;
 const LLVMFalse: LLVMBool = 0;
-pub enum LLVMPassRegistry_opaque {}
-pub type LLVMPassRegistryRef = *mut LLVMPassRegistry_opaque;
 #[allow(missing_copy_implementations)]
 enum LLVMContext_opaque {}
 type LLVMContextRef = *mut LLVMContext_opaque;
@@ -32,75 +30,15 @@ type LLVMMemoryBufferRef = *mut LLVMMemoryBuffer_opaque;
 enum LLVMModule_opaque {}
 type LLVMModuleRef = *mut LLVMModule_opaque;
 #[allow(missing_copy_implementations)]
-pub enum LLVMTarget_opaque {}
-pub type LLVMTargetRef = *mut LLVMTarget_opaque;
-pub enum LLVMTargetMachine_opaque {}
-pub type LLVMTargetMachineRef = *mut LLVMTargetMachine_opaque;
-pub enum LLVMArchive_opaque {}
-pub type LLVMArchiveRef = *mut LLVMArchive_opaque;
-pub enum LLVMArchiveIterator_opaque {}
-pub type LLVMArchiveIteratorRef = *mut LLVMArchiveIterator_opaque;
-pub enum LLVMArchiveChild_opaque {}
-pub type LLVMArchiveChildRef = *mut LLVMArchiveChild_opaque;
+enum LLVMTarget_opaque {}
+type LLVMTargetRef = *mut LLVMTarget_opaque;
+enum LLVMTargetMachine_opaque {}
+type LLVMTargetMachineRef = *mut LLVMTargetMachine_opaque;
+enum LLVMArchiveChild_opaque {}
+type LLVMArchiveChildRef = *mut LLVMArchiveChild_opaque;
 #[allow(missing_copy_implementations)]
-pub enum LLVMRustArchiveMember_opaque {}
-pub type LLVMRustArchiveMemberRef = *mut LLVMRustArchiveMember_opaque;
-
-
-
-#[derive(Copy, Clone, PartialEq, Debug)]
-#[repr(C)]
-pub enum RelocMode {
-    Default = 0,
-    Static = 1,
-    PIC = 2,
-    DynamicNoPic = 3,
-}
-
-#[repr(C)]
-#[derive(Copy, Clone, Debug)]
-pub enum CodeGenModel {
-    Default = 0,
-    JITDefault = 1,
-    Small = 2,
-    Kernel = 3,
-    Medium = 4,
-    Large = 5,
-}
-
-#[derive(Copy, Clone, PartialEq, Debug)]
-#[repr(C)]
-pub enum CodeGenOptLevel {
-    O0 = 0,
-    O1 = 1,
-    O2 = 2,
-    O3 = 3,
-}
-
-#[allow(dead_code)]
-#[repr(C)]
-enum  VerifierFailureAction {
-    AbortProcess = 0,
-    PrintMessage = 1,
-    ReturnStatus = 2,
-}
-
-#[allow(dead_code)]
-#[repr(C)]
-enum CodeGenFileType {
-    Assembly = 0,
-    Object = 1,
-}
-
-#[allow(dead_code)]
-#[repr(C)]
-#[derive(Copy, Clone)]
-pub enum ArchiveKind {
-    K_GNU,
-    K_MIPS64,
-    K_BSD,
-    K_COFF,
-}
+enum LLVMRustArchiveMember_opaque {}
+type LLVMRustArchiveMemberRef = *mut LLVMRustArchiveMember_opaque;
 
 extern {
     fn LLVMContextCreate() -> LLVMContextRef;
@@ -119,9 +57,9 @@ extern {
                                triple: *const libc::c_char,
                                cpu: *const libc::c_char,
                                features: *const libc::c_char,
-                               lvl: CodeGenOptLevel,
-                               reloc: RelocMode,
-                               cm: CodeGenModel) -> LLVMTargetMachineRef;
+                               lvl: Optimisation,
+                               reloc: Relocations,
+                               cm: CodegenModel) -> LLVMTargetMachineRef;
     fn LLVMDisposeTargetMachine(_: LLVMTargetMachineRef);
     fn LLVMTargetMachineEmitToFile (_: LLVMTargetMachineRef,
                                             _: LLVMModuleRef,
@@ -147,6 +85,87 @@ extern {
                             Kind: ArchiveKind) -> libc::c_int;
 }
 
+#[allow(dead_code)]
+#[repr(C)]
+enum VerifierFailureAction {
+    AbortProcess = 0,
+    PrintMessage = 1,
+    ReturnStatus = 2,
+}
+
+#[allow(dead_code)]
+#[repr(C)]
+enum CodeGenFileType {
+    Assembly = 0,
+    Object = 1,
+}
+
+
+/// Relocation mode
+///
+/// This option decides how relocations are handled.
+#[derive(Copy, Clone, PartialEq, Debug)]
+#[repr(C)]
+pub enum Relocations {
+    /// Target default relocation model
+    Default = 0,
+    /// Non-relocatable code
+    Static = 1,
+    /// Fully relocatable, position independent code
+    PIC = 2,
+    /// Relocatable external references, non-relocatable code
+    DynamicNoPic = 3,
+}
+
+/// Codegen model
+#[repr(C)]
+#[derive(Copy, Clone, Debug)]
+pub enum CodegenModel {
+    /// Target default code model
+    Default = 0,
+    /// Small code model
+    Small = 2,
+    /// Kernel code model
+    Kernel = 3,
+    /// Medium code model
+    Medium = 4,
+    /// Large code model
+    Large = 5,
+}
+
+/// Codegen optimisation level
+#[derive(Copy, Clone, PartialEq, Debug)]
+#[repr(C)]
+pub enum Optimisation {
+    /// No codegen optimisation
+    ///
+    /// Corresponds to the -O0 option of `llc`
+    O0 = 0,
+    /// Some codegen optimisations
+    ///
+    /// Corresponds to the -O1 option of `llc`
+    O1 = 1,
+    /// Considerable codegen optimisations
+    ///
+    /// Corresponds to the -O2 option of `llc`
+    O2 = 2,
+    /// Heavy codegen optimisations
+    ///
+    /// Corresponds to the -O3 option of `llc`
+    O3 = 3,
+}
+
+/// The format of generated archive file
+#[allow(dead_code)]
+#[repr(C)]
+#[derive(Copy, Clone)]
+pub enum ArchiveKind {
+    Gnu,
+    Mips64,
+    Bsd,
+    Coff,
+}
+
 #[derive(Debug)]
 pub struct BuildOptions {
     pub triple: String,
@@ -160,13 +179,19 @@ pub struct BuildOptions {
 
 impl Default for BuildOptions {
     fn default() -> BuildOptions {
+        use std::env::var;
         BuildOptions {
-            triple: ::std::env::var("TARGET").unwrap_or(String::new()),
+            triple: var("TARGET").unwrap_or(String::new()),
             cpu: String::new(),
             attr: String::new(),
-            model: CodeGenModel::Default,
-            reloc: RelocMode::Default,
-            opt: CodeGenOptLevel::O0,
+            model: CodegenModel::Default,
+            reloc: Relocations::Default,
+            opt: match var("OPT_LEVEL").ok().and_then(|v| v.parse().ok()).unwrap_or(0u64) {
+                0 => Optimisation::O0,
+                1 => Optimisation::O1,
+                2 => Optimisation::O2,
+                3 | _ => Optimisation::O3,
+            },
             ar_section_name: String::new(),
         }
     }
@@ -311,7 +336,7 @@ where P: AsRef<Path>, I: IntoIterator<Item=&'a (P, BuildOptions)>
                                      members.len() as libc::size_t,
                                      members.as_ptr(),
                                      true,
-                                     ArchiveKind::K_GNU);
+                                     ArchiveKind::Gnu);
         fail_if!(r != 0, "{:?}", {
             let err = LLVMRustGetLastError();
             if err.is_null() {
