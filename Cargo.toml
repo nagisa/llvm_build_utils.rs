@@ -8,7 +8,7 @@ something gcc crate cannot quite handle yet?  Welcome to llvm_build_utils which 
 convenient API to pack your .ll or .bc files into a ready to use archive full of machine code! It
 doesn’t even need LLVM installation*!"""
 documentation = "https://crates.fyi/crates/llvm_build_utils/0.1.0"
-repository = "TBA"
+repository = "https://github.com/nagisa/llvm_build_utils.rs"
 keywords = ["llvm", "asm", "ll", "bc"]
 license = "ISC/Apache 2.0"
 
