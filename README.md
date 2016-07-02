@@ -3,6 +3,8 @@ cannot quite handle yet? Welcome to llvm_build_utils which provides a convenient
 LLVM-IR or LLVM bytecode files into a ready to use archive full of machine code! It doesn’t even
 need LLVM installation and works on stable Rust¹!
 
+No MSVC windows support yet, though
+
 [Documentation](TBA)
 
 ¹: May break between versions or be incompatible with some versions of Rust, though. We’ll try to
