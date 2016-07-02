@@ -51,7 +51,7 @@ fn find_llvm_lib() -> PathBuf {
         let entry_path = entry.expect("could not read dir").path();
         let ret = if let Some(Some(st)) = entry_path.file_name().map(|f| f.to_str()) {
             println!("{:?} in bin", st);
-            !st.contains(".dll.lib") && st.contains("rustc_llvm")
+            st.contains(".dll.lib") && st.contains("rustc_llvm")
         } else { false };
         if ret {
             return entry_path;
@@ -69,31 +69,12 @@ mod hack {
 #[cfg(windows)]
 mod hack {
     use std::path::PathBuf;
+    use std::fs::File;
+    use std::io::Write;
     use std::ffi::{CStr, CString};
+    use std::os::windows::ffi::{OsStrExt, OsStringExt};
     use super::winapi;
     use super::kernel32;
-    struct IMAGE_DOS_HEADER {
-        e_magic:    winapi::WORD,
-        e_cblp:     winapi::WORD,
-        e_cp:       winapi::WORD,
-        e_crlc:     winapi::WORD,
-        e_cparhdr:  winapi::WORD,
-        e_minalloc: winapi::WORD,
-        e_maxalloc: winapi::WORD,
-        e_ss:       winapi::WORD,
-        e_sp:       winapi::WORD,
-        e_csum:     winapi::WORD,
-        e_ip:       winapi::WORD,
-        e_cs:       winapi::WORD,
-        e_lfarlc:   winapi::WORD,
-        e_ovno:     winapi::WORD,
-        e_res:      [winapi::WORD; 4],
-        e_oemid:    winapi::WORD,
-        e_oeminfo:  winapi::WORD,
-        e_res2:     [winapi::WORD; 10],
-        e_lfanew:   winapi::LONG,
-    }
-
     struct IMAGE_EXPORT_DIRECTORY {
         Characteristics:       winapi::DWORD,
         TimeDateStamp:         winapi::DWORD,
@@ -103,12 +84,12 @@ mod hack {
         Base:                  winapi::DWORD,
         NumberOfFunctions:     winapi::DWORD,
         NumberOfNames:         winapi::DWORD,
-        AddressOfFunctions:    *mut winapi::LPDWORD,
-        AddressOfNames:        *mut winapi::LPDWORD,
-        AddressOfNameOrdinals: *mut winapi::LPWORD,
+        AddressOfFunctions:    winapi::DWORD,
+        AddressOfNames:        winapi::DWORD,
+        AddressOfNameOrdinals: winapi::DWORD,
     }
     const IMAGE_DOS_SIGNATURE: winapi::WORD = 0x5A4D;
-    const LOAD_LIBRARY_AS_DATAFILE: winapi::DWORD = 0x2;
+    const DONT_RESOLVE_DLL_REFERENCES: winapi::DWORD = 0x1;
     const IMAGE_NT_SIGNATURE: winapi::DWORD = 0x00004550;
 
     // At this point I’m wondering how much farther does this hack of a library needs to go. On one
@@ -118,28 +99,47 @@ mod hack {
     // initialize the LLVM…
     pub fn that_windows_hack(libpath: PathBuf) {
         /* very */ unsafe { // stuff
-            let p = libpath.with_extension("").into_os_string().into_string().ok().unwrap();
-            let cstr = CString::new(p).expect("null bytes");
-            let lib = kernel32::LoadLibraryExW(cstr.as_ptr(), ::std::ptr::null(),
-                                               LOAD_LIBRARY_AS_DATAFILE);
-            assert!(lib.is_null(), "could not load teh library");
-            let dos_hdr = *(lib as *mut IMAGE_DOS_HEADER);
-            assert!(dos_hdr.e_magic == IMAGE_DOS_SIGNATURE);
-            let nthdr = (lib as winapi::PBYTE).offset(dos_hdr.e_lfanew as isize)
-                as winapi::PIMAGE_NT_HEADERS;
-            assert!((*nthdr).Signature == IMAGE_NT_SIGNATURE);
-            assert!((*nthdr).OptionalHeader.NumberOfRvaAndSizes > 0);
-            let exports = (lib as winapi::PBYTE)
-                .offset((*nthdr).OptionalHeader
-                                .DataDirectory[winapi::IMAGE_DIRECTORY_ENTRY_EXPORT as usize]
-                                .VirtualAddress as isize)
-                as *mut IMAGE_EXPORT_DIRECTORY;
-            assert!(!(*exports).AddressOfNames.is_null());
-            let names = lib.offset((*exports).AddressOfNames) as *mut winapi::PBYTE;
-            for i in 0..(*exports.NumberOfNames) {
-                println!("{:?}", CStr::from_ptr(names.offset(i)));
+            let p = libpath.with_extension("").into_os_string();
+            println!("loading {:?}", p);
+            let wide_filename: Vec<u16> = p.encode_wide().chain(Some(0)).collect();
+            let lib = kernel32::LoadLibraryExW(wide_filename.as_ptr(), ::std::ptr::null_mut(),
+                                               DONT_RESOLVE_DLL_REFERENCES);
+            assert!(!lib.is_null(), "could not load teh library");
+            println!("loaded indeed {:p}", lib);
+            assert_eq!(*(lib as winapi::PWORD), IMAGE_DOS_SIGNATURE);
+            println!("DOS indeed");
+            let nthdr_off = (*((lib as winapi::PBYTE).offset(0x3c)
+                             as *mut winapi::DWORD)) as isize;
+            println!("nthdr off {:x}", nthdr_off);
+            let ref nthdr = *((lib as winapi::PBYTE).offset(nthdr_off)
+                               as winapi::PIMAGE_NT_HEADERS);
+            assert_eq!(nthdr.Signature, IMAGE_NT_SIGNATURE);
+            println!("NT indeed");
+            assert!(nthdr.OptionalHeader.NumberOfRvaAndSizes > 0);
+            println!("Has that many things {:?}", nthdr.OptionalHeader.NumberOfRvaAndSizes);
+            let exports_off = nthdr.OptionalHeader
+                                   .DataDirectory[winapi::IMAGE_DIRECTORY_ENTRY_EXPORT as usize]
+                                   .VirtualAddress as isize;
+            let ref exports = *((lib as winapi::PBYTE).offset(exports_off)
+                            as *mut IMAGE_EXPORT_DIRECTORY);
+            assert!(exports.AddressOfNames != 0);
+            println!("{} exports @ {:?}", exports.NumberOfNames, exports.AddressOfNames);
+            let names = (lib as winapi::PBYTE).offset(exports.AddressOfNames as isize)
+                         as *mut winapi::DWORD;
+            for i in 0..exports.NumberOfNames {
+                let name = (lib as winapi::PBYTE).offset(*names.offset(i as isize) as isize)
+                            as *mut _;
+                let symbol = CStr::from_ptr(name).to_string_lossy();
+                println!("symbol name {} at {:?}", i, symbol);
+                if !symbol.contains("initialize_available_targets") { continue }
+                println!("found symbol {}", symbol);
+                let mut f = File::create("src/that_windows_hack.rs")
+                    .expect("could not open the hack");
+                writeln!(f, r#"extern "Rust" {{ fn {}(); }}"#, symbol).unwrap();
+                writeln!(f, r#"pub unsafe fn init_llvm() {{ {}() }}"#, symbol).unwrap();
+                println!("cargo:rustc-cfg=do_windows_hack");
+                return;
             }
-            panic!()
         }
     }
 }

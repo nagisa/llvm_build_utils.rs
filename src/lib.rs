@@ -274,6 +274,16 @@ impl Default for BuildOptions {
     }
 }
 
+#[cfg(do_windows_hack)]
+mod that_windows_hack;
+#[cfg(do_windows_hack)]
+fn initialize_llvm() {
+    static ONCE: Once = ONCE_INIT;
+    ONCE.call_once(|| unsafe {
+        that_windows_hack::init_llvm();
+    });
+}
+#[cfg(not(do_windows_hack))]
 fn initialize_llvm() {
     static ONCE: Once = ONCE_INIT;
 
