@@ -44,6 +44,7 @@
 #![allow(non_camel_case_types, non_upper_case_globals)]
 extern crate libc;
 extern crate mktemp;
+extern crate target_build_utils;
 
 use std::path::Path;
 use std::ffi::{CString, CStr};
@@ -188,14 +189,32 @@ pub enum Optimisation {
 }
 
 /// The format of generated archive file
-#[allow(dead_code)]
 #[repr(C)]
 #[derive(Copy, Clone)]
-enum ArchiveKind {
+pub enum ArchiveKind {
+    /// GNU archive format, default in majority of cases
     Gnu,
+    /// MIPS64 archive format
     Mips64,
+    /// BSD archive format, default on OS X and iOS systems
     Bsd,
+    /// COFF archive format
     Coff,
+}
+
+impl Default for ArchiveKind {
+    /// Gets the default ArchiveKind depending on `TARGET` variable
+    ///
+    /// If the `TARGET` envronment variable is not set or the target spec cannot be parsed for some
+    /// reason, this function will panic.
+    fn default() -> ArchiveKind {
+        let target_info = target_build_utils::TargetInfo::new()
+            .expect("could not parse target info");
+        match target_info.target_os() {
+            "macos" | "ios" => ArchiveKind::Bsd,
+            _ => ArchiveKind::Gnu
+        }
+    }
 }
 
 #[derive(Debug)]
@@ -325,6 +344,16 @@ macro_rules! fail_if {
 /// is autodetected.
 pub fn build_archive<'a, P: 'a, I>(archive: P, iter: I)
 -> Result<(), String>
+where P: AsRef<Path>, I: IntoIterator<Item=&'a (P, BuildOptions)> {
+    build_archive_kind(ArchiveKind::default(), archive, iter)
+}
+
+/// Produce a static library (archive) containing machine code in specific format
+///
+/// The input files must be well formed LLVM-IR files or LLVM bytecode. Format of the input file
+/// is autodetected.
+pub fn build_archive_kind<'a, P: 'a, I>(format: ArchiveKind, archive: P, iter: I)
+-> Result<(), String>
 where P: AsRef<Path>, I: IntoIterator<Item=&'a (P, BuildOptions)>
 {
     initialize_llvm();
@@ -415,7 +444,7 @@ where P: AsRef<Path>, I: IntoIterator<Item=&'a (P, BuildOptions)>
                                      members.len() as libc::size_t,
                                      members.as_ptr(),
                                      true,
-                                     ArchiveKind::Gnu);
+                                     format);
         fail_if!(r != 0, "{:?}", {
             let err = LLVMRustGetLastError();
             if err.is_null() {
