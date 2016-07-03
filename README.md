@@ -41,8 +41,7 @@ fn main() {
         ("input.ll", BuildOptions {
             ..BuildOptions::default() // customise how the file is built
         })
-    ]).expect("error happened");
-    // ...
+    ]).expect("error happened").print();
 }
 ```
 

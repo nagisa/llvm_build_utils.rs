@@ -10,7 +10,7 @@ fn test_build() {
     }), ("tests/test.ll", BuildOptions {
         triple: String::from("i386-unknown-linux-gnu"),
         ..BuildOptions::default()
-    })]).unwrap();
+    })]).unwrap().print();
 }
 
 #[test]
@@ -18,7 +18,7 @@ fn test_bytecode_build() {
     build_archive_kind(ArchiveKind::Gnu, "libtestbc.a", &[("tests/test.bc", BuildOptions {
         triple: String::from("x86_64-unknown-linux-gnu"),
         ..BuildOptions::default()
-    })]).unwrap();
+    })]).unwrap().print();
 }
 
 #[test]
@@ -33,7 +33,7 @@ fn test_cpu_attr() {
         cpu: String::from("x86-64"),
         attr: String::from("+rdseed"),
         ..BuildOptions::default()
-    })]).unwrap();
+    })]).unwrap().print();
 }
 
 #[test]
@@ -48,7 +48,7 @@ fn allow_dynamic_dispatch() {
     }), (&"tests/test.ll" as &AsRef<Path>, BuildOptions {
         triple: String::from("i386-unknown-linux-gnu"),
         ..BuildOptions::default()
-    })]).unwrap();
+    })]).unwrap().print();
 }
 
 #[test]
@@ -59,31 +59,44 @@ fn test_optimisation() {
         attr: String::from("+rdrnd"),
         opt: Optimisation::O3,
         ..BuildOptions::default()
-    })]).unwrap();
+    })]).unwrap().print();
 }
 
 #[test]
 fn test_wrong_things_fail_1() {
+    println!("{}",
     build_archive_kind(ArchiveKind::Gnu, "fail.a", &[("tests/does_not_exist_for_sure.ll",
-                     BuildOptions::default())]).err().unwrap();
+                     BuildOptions::default())]).err().unwrap());
 }
 
 #[test]
 fn test_wrong_things_fail_2() {
+    println!("{}",
     build_archive_kind(ArchiveKind::Gnu, "/", &[("tests/test.ll",
-                     BuildOptions::default())]).err().unwrap();
+                     BuildOptions::default())]).err().unwrap());
 }
 
 #[test]
 fn test_wrong_things_fail_3() {
+    println!("{}",
     build_archive_kind(ArchiveKind::Gnu, "banana.a/", &[("tests/test.ll",
-                     BuildOptions::default())]).err().unwrap();
+                     BuildOptions::default())]).err().unwrap());
 }
 
 #[test]
 fn test_wrong_things_fail_4() {
+    println!("{}",
     build_archive_kind(ArchiveKind::Gnu, "test.a", &[("tests/test.ll", BuildOptions {
         triple: String::from("some weird triple this is"),
         ..BuildOptions::default()
-    })]).err().unwrap();
+    })]).err().unwrap());
+}
+
+#[test]
+fn test_wrong_things_fail_5() {
+    println!("{}",
+    build_archive_kind(ArchiveKind::Gnu, "libtest", &[("tests/test.ll", BuildOptions {
+        triple: String::from("some weird triple this is"),
+        ..BuildOptions::default()
+    })]).err().unwrap());
 }

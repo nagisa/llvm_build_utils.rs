@@ -37,3 +37,12 @@ done:
     %val = extractvalue {i16, i32} %result, 0
     ret i16 %val
 }
+
+define zeroext i1 @librdrand_rust_has_rdseed() unnamed_addr #0 {
+entry-block:
+  %0 = tail call { i32, i32, i32, i32 } asm "cpuid", "={eax},={ebx},={ecx},={edx},0,2,~{dirflag},~{fpsr},~{flags}"(i32 7, i32 0)
+  %1 = extractvalue { i32, i32, i32, i32 } %0, 1
+  %2 = and i32 %1, 262144
+  %3 = icmp ne i32 %2, 0
+  ret i1 %3
+}

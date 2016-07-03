@@ -34,8 +34,7 @@
 //!         ("input.ll", BuildOptions {
 //!             ..BuildOptions::default() // customise how the file is built
 //!         })
-//!     ]).expect("error happened");
-//!     // ...
+//!     ]).expect("error happened").print();
 //! }
 //! ```
 //!
@@ -47,7 +46,7 @@ extern crate mktemp;
 extern crate target_build_utils;
 
 use std::path::Path;
-use std::ffi::{CString, CStr};
+use std::ffi::{CString, CStr, OsString, OsStr};
 use std::sync::{Once, ONCE_INIT};
 
 type LLVMBool = libc::c_uint;
@@ -293,6 +292,59 @@ impl Default for BuildOptions {
     }
 }
 
+/// Output for cargo
+pub struct Printout {
+    libname: String,
+    outdir: OsString,
+    deps: Vec<String>
+}
+
+impl Printout {
+    /// Inform cargo about the outcome of compilation
+    ///
+    /// Information cargo receives:
+    ///
+    /// * What library to link to (`print_link`);
+    /// * Where to look for the library in question (`print_path`);
+    /// * List of dependencies which trigger the rebuild (`print_deps`).
+    ///
+    /// All of these may also be printed separately via other methods on this struct.
+    pub fn print(mut self) {
+        self.print_link();
+        self.print_path();
+        self.print_deps();
+    }
+
+    /// Inform cargo of the library to link to
+    pub fn print_link(&mut self) {
+        let name = ::std::mem::replace(&mut self.libname, String::new());
+        if !name.is_empty() {
+            println!("cargo:rustc-link-lib={}", name);
+        }
+    }
+
+    /// Inform cargo of the location where built library resides
+    ///
+    /// May panic if the path to output directory is not valid unicode.
+    pub fn print_path(&mut self) {
+        let outdir = ::std::mem::replace(&mut self.outdir, OsString::new());
+        if !outdir.is_empty() {
+            let od = outdir.into_string().expect("outdir contains invalid unicode");
+            println!("cargo:rustc-link-search=native={}", od);
+        }
+    }
+
+    /// Inform cargo of the dependencies which should trigger a rebuild
+    pub fn print_deps(&mut self) {
+        let deps = ::std::mem::replace(&mut self.deps, Vec::new());
+        for dep in deps {
+            println!("cargo:rerun-if-changed={}", dep);
+        }
+    }
+}
+
+
+
 fn initialize_llvm() {
     static ONCE: Once = ONCE_INIT;
 
@@ -343,23 +395,33 @@ macro_rules! fail_if {
 /// The input files must be well formed LLVM-IR files or LLVM bytecode. Format of the input file
 /// is autodetected.
 pub fn build_archive<'a, P: 'a, I>(archive: P, iter: I)
--> Result<(), String>
+-> Result<Printout, String>
 where P: AsRef<Path>, I: IntoIterator<Item=&'a (P, BuildOptions)> {
     build_archive_kind(ArchiveKind::default(), archive, iter)
 }
 
-/// Produce a static library (archive) containing machine code in specific format
+/// Produce a static library (archive) in specific format
 ///
 /// The input files must be well formed LLVM-IR files or LLVM bytecode. Format of the input file
 /// is autodetected.
 pub fn build_archive_kind<'a, P: 'a, I>(format: ArchiveKind, archive: P, iter: I)
--> Result<(), String>
+-> Result<Printout, String>
 where P: AsRef<Path>, I: IntoIterator<Item=&'a (P, BuildOptions)>
 {
     initialize_llvm();
     let mut strings = vec![];
     let mut members = vec![];
     let mut temps = vec![];
+    let mut deps = vec![];
+    let outpath = ::std::env::var_os("OUT_DIR").unwrap_or_default();
+    let libstem = {
+        fail_if!(archive.as_ref().extension() != Some(OsStr::new("a")), "extension must be .a");
+        let libstem = try!(archive.as_ref().file_stem().and_then(|s| s.to_str()).ok_or_else(||
+                           String::from("output filename has invalid stem")));
+        fail_if!(!libstem.starts_with("lib"), "output filename must start with lib");
+        String::from(&libstem[3..])
+    };
+
     unsafe {
         let ctx = LLVMContextCreate();
         fail_if!(ctx.is_null(), "could not create the context");
@@ -367,10 +429,12 @@ where P: AsRef<Path>, I: IntoIterator<Item=&'a (P, BuildOptions)>
             let mut module = ::std::ptr::null_mut();
             let mut msg = ::std::ptr::null_mut();
 
+            let input_str = try!(p.as_ref().to_str().ok_or_else(||
+                                 String::from("input filename is not utf-8")));
+            deps.push(String::from(input_str));
             // Read the LLVM-IR/BC into memory
-            let path = try!(CString::new(
-                try!(p.as_ref().to_str().ok_or_else(|| String::from("input filename is not utf-8")))
-            ).map_err(|_| String::from("input filename contains nulls")));
+            let path = try!(CString::new(input_str).map_err(|_|
+                            String::from("input filename contains nulls")));
             let buf = LLVMRustCreateMemoryBufferWithContentsOfFile(path.as_ptr());
             fail_if!(buf.is_null(), "could not open input file {:?}: {:?}",
                     p.as_ref(), CStr::from_ptr(LLVMRustGetLastError()));
@@ -437,9 +501,11 @@ where P: AsRef<Path>, I: IntoIterator<Item=&'a (P, BuildOptions)>
             // FIXME: SIGSEGVS for some reason
             // LLVMDisposeMemoryBuffer(buf);
         }
-        let dest = try!(CString::new(try!(
-            archive.as_ref().to_str().ok_or_else(|| String::from("archive filename is not utf-8"))
-        )).map_err(|_| String::from("output file has interior nulls")));
+        let out_target = Path::new(&outpath).join(archive);
+        let libname_str = try!(out_target.to_str().ok_or_else(||
+                               String::from("archive filename is not utf-8")));
+        let dest = try!(CString::new(libname_str).map_err(|_|
+                        String::from("output file has interior nulls")));
         let r = LLVMRustWriteArchive(dest.as_ptr(),
                                      members.len() as libc::size_t,
                                      members.as_ptr(),
@@ -458,6 +524,12 @@ where P: AsRef<Path>, I: IntoIterator<Item=&'a (P, BuildOptions)>
             LLVMRustArchiveMemberFree(member);
         }
         LLVMContextDispose(ctx);
-        Ok(())
+
+
+        Ok(Printout {
+            libname: libstem,
+            outdir: outpath,
+            deps: deps
+        })
     }
 }
