@@ -20,7 +20,7 @@
 //! build = "build.rs"
 //!
 //! [build-dependencies]
-//! llvm_build_utils = "0.1"
+//! llvm_build_utils = "0.3"
 //! ```
 //!
 //! Then write your `build.rs` like this:

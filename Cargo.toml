@@ -1,13 +1,13 @@
 [package]
 name = "llvm_build_utils"
-version = "0.2.0"
+version = "0.3.0"
 authors = ["Simonas Kazlauskas <git@kazlauskas.me>"]
 build = "build.rs"
 description = """Ever wanted to build “native” assembly stuff in your cargo build scripts…
 something gcc crate cannot quite handle yet?  Welcome to llvm_build_utils which provides a
 convenient API to pack your .ll or .bc files into a ready to use archive full of machine code! It
 doesn’t even need an installation of LLVM*!"""
-documentation = "https://crates.fyi/crates/llvm_build_utils/0.2.0"
+documentation = "https://crates.fyi/crates/llvm_build_utils/0.3.0"
 repository = "https://github.com/nagisa/llvm_build_utils.rs"
 keywords = ["llvm", "asm", "ll", "bc"]
 license = "ISC/Apache-2.0"
