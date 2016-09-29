@@ -1,3 +1,6 @@
+**WARNING** Due to the experimental nature of the project I strongly discourage using the crate for
+the time being
+
 Ever wanted to build “native” assemblyish stuff in your cargo build scripts… something gcc crate
 cannot quite handle yet? Welcome to llvm_build_utils which provides a convenient API to pack your
 LLVM-IR or LLVM bytecode files into a ready to use archive full of machine code! It doesn’t even
